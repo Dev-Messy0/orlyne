@@ -165,9 +165,9 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
             dvmsy.updateProfileStatus(`ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴏʀʟʏɴᴇ ʙᴏᴛ |✦| ᴜᴘᴛɪᴍᴇ: ${runtime(process.uptime())}`).catch(_ => _)
         }
         
-        // ÉTAPE 6: Vérification du préfixe
-        if (!body || !body.startsWith(config.PREFIX)) return;
-        
+      // Vérification rapide du préfixe
+if (!body || !body.startsWith(config.PREFIX)) return;
+
         // ÉTAPE 7: Extraire la commande et les arguments
         const args = body.slice(config.PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
