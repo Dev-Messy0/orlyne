@@ -46,7 +46,7 @@ import open from './commands/group/open.js';
 import close from './commands/group/close.js';
 import newlink from './commands/group/newlink.js';
 
-// Commandes settings groupe (avec les nouvelles)
+// Commandes settings groupe
 import { 
     antilink, 
     welcome, 
@@ -104,11 +104,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
         if (!m?.key?.remoteJid) return;
         if (!m.message) return;
         
-        // Vérification supplémentaire pour éviter l'erreur "Cannot read properties of null"
-        if (!m.message.conversation && !m.message.extendedTextMessage && !m.message.imageMessage && !m.message.videoMessage) {
-            return;
-        }
-        
         // Initialiser m.chat pour la compatibilité
         m.chat = m.key.remoteJid;
         
@@ -116,14 +111,18 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
         const messageInfo = getMessageInfo(m, dvmsy);
         const { body, sender, pushName } = messageInfo;
         
-        // Protection si body est null ou undefined
-        if (body === null || body === undefined) {
-            return;
-        }
-        
         // JID et numéro de l'expéditeur
         const senderJid = m.key.participant || m.key.remoteJid;
         const senderNumber = senderJid?.split('@')[0] || "";
+        
+        // Vérifier si le corps du message existe et a un préfixe valide
+        if (!body || !config.hasValidPrefix(body)) return;
+        
+        // Extraire le préfixe et la commande avec la fonction utilitaire
+        const commandInfo = config.getPrefixAndCommand(body);
+        if (!commandInfo) return;
+        
+        const { prefix, command, args } = commandInfo;
         
         // Récupérer les messages dans la langue de l'utilisateur
         const msgLang = getMessages(senderJid);
@@ -162,39 +161,36 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
         }
         
         if (global.autobio) {
-            dvmsy.updateProfileStatus(`ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴏʀʟʏɴᴇ ʙᴏᴛ |✦| ᴜᴘᴛɪᴍᴇ: ${runtime(process.uptime())}`).catch(_ => _)
+            dvmsy.updateProfileStatus(`ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴏʀʟʏɴᴇ ʙᴏᴛ |✦| ᴜᴘᴛɪᴍᴇ: ${runtime(process.uptime())}`).catch(_ => _);
         }
         
-      // Vérification rapide du préfixe
-if (!body || !body.startsWith(config.PREFIX)) return;
-
-        // ÉTAPE 7: Extraire la commande et les arguments
-        const args = body.slice(config.PREFIX.length).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
-        
-        // ÉTAPE 8: Créer l'objet message complet
+        // ÉTAPE 6: Créer l'objet message complet
         const fullMessage = {
             ...m,
             ...messageInfo,
             ...groupInfo,
             ...permissions,
+            // Infos de base (surcharge pour sécurité)
             sender: senderJid,
             senderNumber: senderNumber,
             pushName: pushName || senderNumber,
             isOwner: isOwner,
             isGroup: isGroup,
+            // Commande (utiliser les valeurs extraites)
             command: command,
             args: args,
-            prefix: config.PREFIX,
+            prefix: prefix, // Le préfixe réellement utilisé
+            // Configuration
             config: config
         };
         
-        console.log(`📩 [${isGroup ? '👥 GROUPE' : '👤 PRIVÉ'}] Commande: ${command} de ${fullMessage.pushName} (Owner: ${isOwner}, Admin: ${fullMessage.isAdmin})`);
+        console.log(`📩 [${isGroup ? '👥 GROUPE' : '👤 PRIVÉ'}] Commande: ${command} (préfixe: ${prefix}) de ${fullMessage.pushName} (Owner: ${isOwner}, Admin: ${fullMessage.isAdmin})`);
         
-        // ÉTAPE 9: Exécution des commandes avec réactions
+        // ÉTAPE 7: Exécution des commandes avec réactions
         let commandExecuted = false;
         
         switch(command) {
+            // ========== COMMANDES GROUPE ==========
             case 'tagall':
                 await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_tagall || "📢");
                 if (!isGroup) { 
@@ -351,6 +347,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDES SETTINGS ==========
             case 'antispam':
                 await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_antispam || "🚫");
                 if (!isGroup) { 
@@ -391,6 +388,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDES GÉNÉRALES ==========
             case 'ping':
                 await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_ping || "🏓");
                 await ping(fullMessage, dvmsy);
@@ -448,6 +446,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDES TOOLS ==========
             case 'url':
             case 'lien':
             case 'upload':
@@ -512,6 +511,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDES DOWNLOAD ==========
             case 'youtube':
             case 'yt':
             case 'video':
@@ -560,6 +560,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDES OWNER ==========
             case 'clearchat':
             case 'cc':
             case 'clear':
@@ -575,6 +576,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDES CONVERSION ==========
             case 'to-img':
             case 'toimage':
             case 'imagedesticker':
@@ -625,6 +627,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
             
+            // ========== COMMANDES LANGUE ==========
             case 'setlang':
             case 'language':
             case 'langue':
@@ -633,6 +636,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
     
+            // ========== COMMANDES MODE ==========
             case "mode-pub":
             case "public":
             case "mode-public":
@@ -666,6 +670,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 commandExecuted = true;
                 break;
 
+            // ========== COMMANDE INCONNUE ==========
             default:
                 if (command) {
                     await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_unknown || "❓");
@@ -673,6 +678,7 @@ if (!body || !body.startsWith(config.PREFIX)) return;
                 }
         }
 
+        // Réaction finale si commande exécutée
         if (commandExecuted) {
             await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_success || "✅");
         }
@@ -681,13 +687,13 @@ if (!body || !body.startsWith(config.PREFIX)) return;
         console.error('❌ Erreur dans handlerCommand:', error);
         
         try {
-            await sendReaction(dvmsy, m.chat, m.key, "❌");
+            await sendReaction(dvmsy, m.chat, m.key, msgLang?.reaction_error || "❌");
         } catch (e) {}
         
         try {
             if (m?.chat) {
                 await dvmsy.sendMessage(m.chat, { 
-                    text: `❌ Erreur : ${error.message || 'Une erreur est survenue.'}`
+                    text: `❌ Erreur : ${error.message || 'Une erreur est survenue lors de l\'exécution de la commande.'}`
                 });
             }
         } catch (sendError) {
