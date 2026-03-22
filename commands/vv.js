@@ -94,14 +94,6 @@ export default async function vv(m, dvmsy) {
             );
         }
 
-        // Confirmer à l'utilisateur
-        await dvmsy.sendMessage(
-            m.chat,
-            { 
-                text: msg.vv_sent
-            },
-            { quoted: m }
-        );
 
     } catch (e) {
         console.error('[vv] erreur:', e);
