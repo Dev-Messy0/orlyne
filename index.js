@@ -18,7 +18,7 @@ import cors from 'cors';
 import chalk from 'chalk'
 import { fileURLToPath } from 'url';
 import handlerCommand from './handler.js';
-import { smsg } from './Utils/func.js';
+
 import setupGroupHandlers from './system/group-handler.js';
 import { initLanguage } from './Utils/langManager.js';
 
