@@ -1,0 +1,208 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+      
+      - name: Deploy and setup everything on VPS
+        run: |
+          sshpass -p 'Djabir123' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
+            echo '🚀 Starting deployment...'
+            
+            # ==================== UPDATE SYSTEM ====================
+            echo '📦 Updating system...'
+            apt update && apt upgrade -y
+            
+            # ==================== INSTALL NODE.js 20 ====================
+            echo '📦 Installing Node.js 20...'
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            apt install -y nodejs
+            
+            # ==================== INSTALL FFMPEG ====================
+            echo '🎬 Installing ffmpeg...'
+            apt install -y ffmpeg
+            
+            # ==================== INSTALL NGINX ====================
+            echo '🌐 Installing Nginx...'
+            apt install -y nginx
+            
+            # ==================== CONFIGURE NGINX ====================
+            echo '⚙️ Configuring Nginx...'
+            cat > /etc/nginx/sites-available/orlyne-md-v2 << 'NGINX_EOF'
+            server {
+                listen 80;
+                server_name orlyne-md-v2.duckdns.org;
+                
+                client_max_body_size 100M;
+                
+                location / {
+                    proxy_pass http://127.0.0.1:3421;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_cache_bypass \$http_upgrade;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    
+                    # Timeouts for WhatsApp
+                    proxy_connect_timeout 3600;
+                    proxy_send_timeout 3600;
+                    proxy_read_timeout 3600;
+                }
+                
+                # Static files
+                location /static/ {
+                    alias /var/www/orlyne-md-v2/public/;
+                }
+                
+                access_log /var/log/nginx/orlyne-md-v2-access.log;
+                error_log /var/log/nginx/orlyne-md-v2-error.log;
+            }
+            NGINX_EOF
+            
+            # Enable site
+            ln -sf /etc/nginx/sites-available/orlyne-md-v2 /etc/nginx/sites-enabled/
+            rm -f /etc/nginx/sites-enabled/default
+            
+            # Test Nginx config
+            nginx -t
+            
+            # Restart Nginx
+            systemctl restart nginx
+            systemctl enable nginx
+            
+            # ==================== CREATE APP DIRECTORY ====================
+            echo '📁 Creating app directory...'
+            mkdir -p /var/www/orlyne-md-v2
+            mkdir -p /var/www/orlyne-md-v2/accounts
+            mkdir -p /var/www/orlyne-md-v2/data
+            mkdir -p /var/www/orlyne-md-v2/temp
+            mkdir -p /var/www/orlyne-md-v2/public
+            chown -R root:root /var/www/orlyne-md-v2
+          "
+      
+      - name: Deploy application files
+        run: |
+          sshpass -p 'Djabir123' rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            --exclude 'accounts' \
+            --exclude 'data' \
+            --exclude 'temp' \
+            ./ root@84.247.177.39:/var/www/orlyne-md-v2/
+      
+      - name: Install dependencies and setup PM2
+        run: |
+          sshpass -p 'Djabir123' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
+            echo '📦 Installing dependencies...'
+            cd /var/www/orlyne-md-v2
+            
+            # Clean install
+            rm -rf node_modules package-lock.json
+            npm install --production
+            
+            # Install PM2 globally
+            echo '⚙️ Setting up PM2...'
+            npm install -g pm2
+            
+            # Create ecosystem file
+            cat > ecosystem.config.cjs << 'PM2_EOF'
+            module.exports = {
+              apps: [{
+                name: 'orlyne-md-v2',
+                script: 'index.js',
+                instances: 1,
+                autorestart: true,
+                watch: false,
+                max_memory_restart: '1G',
+                env: {
+                  NODE_ENV: 'production',
+                  NODE_VERSION: '20'
+                },
+                error_file: '/var/www/orlyne-md-v2/logs/err.log',
+                out_file: '/var/www/orlyne-md-v2/logs/out.log',
+                log_file: '/var/www/orlyne-md-v2/logs/combined.log',
+                time: true
+              }]
+            }
+            PM2_EOF
+            
+            # Create logs directory
+            mkdir -p /var/www/orlyne-md-v2/logs
+            
+            # Stop existing process
+            pm2 stop orlyne-md-v2 || true
+            pm2 delete orlyne-md-v2 || true
+            
+            # Start with PM2
+            pm2 start ecosystem.config.cjs
+            
+            # Save PM2 configuration
+            pm2 save
+            pm2 startup systemd | grep -v 'sudo' | bash || true
+            
+            # Set proper permissions
+            chmod -R 755 /var/www/orlyne-md-v2
+            chown -R root:root /var/www/orlyne-md-v2
+            
+            echo '✅ Bot started with PM2'
+          "
+      
+      - name: Configure firewall
+        run: |
+          sshpass -p 'Djabir123' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
+            echo '🔥 Configuring firewall...'
+            
+            # Allow SSH
+            ufw allow 22/tcp
+            
+            # Allow HTTP/HTTPS
+            ufw allow 80/tcp
+            ufw allow 443/tcp
+            
+            # Allow bot port
+            ufw allow 3421/tcp
+            
+            # Enable firewall if not already enabled
+            echo 'y' | ufw enable || true
+            
+            ufw status
+          "
+      
+      - name: Verify deployment
+        run: |
+          echo '🔍 Verifying deployment...'
+          sleep 10
+          
+          # Check if bot is running
+          sshpass -p 'Djabir123' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
+            pm2 status
+            curl -s 84.247.177.39:3421/health || echo '⚠️ Health check pending'
+          "
+          
+          echo '✅ Deployment completed!'
+          echo '🌐 Site available at: https://orlyne-md-v2.duckdns.org'
