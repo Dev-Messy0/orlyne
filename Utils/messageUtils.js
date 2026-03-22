@@ -4,7 +4,6 @@ import config from '../config.js';
 /**
  * Extrait les informations de base du message
  */
-
 export function getMessageInfo(m, dvmsy) {
     try {
         if (!m) return { body: '', sender: '', pushName: '' };
@@ -15,7 +14,6 @@ export function getMessageInfo(m, dvmsy) {
         let body = '';
         let pushName = m.pushName || '';
         
-        // Protection contre les messages null
         const msgContent = m.message[messageType];
         if (!msgContent) return { body: '', sender: m.key?.participant || m.key?.remoteJid || '', pushName };
         
@@ -48,9 +46,81 @@ export function getMessageInfo(m, dvmsy) {
     }
 }
 
-export { 
-    getMessageInfo, 
-    checkIsOwner, 
-    getGroupInfo, 
-    getUserPermissions 
-};
+/**
+ * Vérifie si un utilisateur est owner
+ */
+export function checkIsOwner(senderJid, senderNumber, m, dvmsy) {
+    const ownerNums = [config.OWNER_NUMBER].filter(Boolean);
+    
+    return ownerNums.includes(senderNumber) || 
+           config.OWNERS.includes(senderJid) || 
+           m?.key?.fromMe || 
+           (dvmsy?.user && senderJid === dvmsy.user.id);
+}
+
+/**
+ * Récupère les informations du groupe
+ */
+export async function getGroupInfo(m, dvmsy) {
+    try {
+        if (!m.key.remoteJid.endsWith('@g.us')) {
+            return { 
+                isGroup: false,
+                participants: [],
+                groupName: '',
+                isAdmin: false,
+                isBotAdmin: false,
+                metadata: {}
+            };
+        }
+        
+        const metadata = await dvmsy.groupMetadata(m.key.remoteJid);
+        const participants = metadata.participants || [];
+        
+        const senderJid = m.key.participant || m.key.remoteJid;
+        const botJid = dvmsy.user?.id?.split(':')[0] + '@s.whatsapp.net';
+        
+        const senderParticipant = participants.find(p => p.id === senderJid);
+        const isAdmin = senderParticipant && 
+                       (senderParticipant.admin === "admin" || 
+                        senderParticipant.admin === "superadmin");
+        
+        const botParticipant = participants.find(p => p.id === botJid);
+        const isBotAdmin = botParticipant && 
+                          (botParticipant.admin === "admin" || 
+                           botParticipant.admin === "superadmin");
+        
+        return {
+            isGroup: true,
+            groupName: metadata.subject || '',
+            groupId: m.key.remoteJid,
+            participants,
+            groupAdmins: participants.filter(p => p.admin),
+            metadata,
+            isAdmin,
+            isBotAdmin
+        };
+    } catch (error) {
+        console.error('Erreur getGroupInfo:', error);
+        return { 
+            isGroup: true,
+            participants: [],
+            groupName: '',
+            isAdmin: false,
+            isBotAdmin: false,
+            metadata: {}
+        };
+    }
+}
+
+/**
+ * Récupère les permissions de l'utilisateur
+ */
+export function getUserPermissions(senderJid, isOwner = false, isAdmin = false) {
+    return {
+        isOwner,
+        isAdmin,
+        canUseOwnerCommands: isOwner,
+        canUseAdminCommands: isOwner || isAdmin
+    };
+}
