@@ -1,3 +1,4 @@
+
 export default {
     PREFIXES: ['.', '!', '/', '$','@','&',':'], // Plusieurs préfixes
     BOT_NAME: "ORLYNE",
