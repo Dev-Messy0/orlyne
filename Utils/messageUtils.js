@@ -47,3 +47,10 @@ export function getMessageInfo(m, dvmsy) {
         return { body: '', sender: '', pushName: '' };
     }
 }
+
+export { 
+    getMessageInfo, 
+    checkIsOwner, 
+    getGroupInfo, 
+    getUserPermissions 
+};
