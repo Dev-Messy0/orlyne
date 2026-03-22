@@ -31,28 +31,35 @@ jobs:
           sshpass -p 'Djabir123' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
             echo '🚀 Starting deployment...'
             
-            # Create app directory
-            mkdir -p /var/www/orlyne-md-v2
             cd /var/www/orlyne-md-v2
             
-            # Install Node.js 20 if not already
+            # Create directories if not exist
+            mkdir -p /var/www/orlyne-md-v2/{accounts,data,temp,public,logs}
+            
+            # ==================== INSTALL ONLY ONCE ====================
+            # Check if Node.js 20 is installed
             if ! command -v node &> /dev/null || [ \$(node -v | cut -d. -f1 | tr -d 'v') -lt 20 ]; then
+              echo '📦 Installing Node.js 20...'
               curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
               apt install -y nodejs
             fi
             
-            # Install ffmpeg if not already
+            # Check if ffmpeg is installed
             if ! command -v ffmpeg &> /dev/null; then
+              echo '🎬 Installing ffmpeg...'
               apt install -y ffmpeg
             fi
             
-            # Install PM2 if not already
+            # Check if PM2 is installed
             if ! command -v pm2 &> /dev/null; then
+              echo '⚙️ Installing PM2...'
               npm install -g pm2
             fi
             
-            # Configure Nginx
-            cat > /etc/nginx/sites-available/orlyne-md-v2 << 'NGINX_EOF'
+            # ==================== NGINX CONFIG (ONLY IF NOT EXISTS) ====================
+            if [ ! -f /etc/nginx/sites-available/orlyne-md-v2 ]; then
+              echo '🌐 Configuring Nginx...'
+              cat > /etc/nginx/sites-available/orlyne-md-v2 << 'NGINX_EOF'
             server {
                 listen 80;
                 server_name orlyne-md-v2.duckdns.org;
@@ -71,24 +78,27 @@ jobs:
                 }
             }
             NGINX_EOF
-            
-            # Enable site
-            ln -sf /etc/nginx/sites-available/orlyne-md-v2 /etc/nginx/sites-enabled/
-            rm -f /etc/nginx/sites-enabled/default
-            
-            # Test and reload Nginx
-            nginx -t && systemctl reload nginx
-            
-            # Install Certbot if not already
-            if ! command -v certbot &> /dev/null; then
-              apt install -y certbot python3-certbot-nginx
+              
+              ln -sf /etc/nginx/sites-available/orlyne-md-v2 /etc/nginx/sites-enabled/
+              rm -f /etc/nginx/sites-enabled/default
+              nginx -t && systemctl reload nginx
             fi
             
-            # Get SSL certificate
-            certbot --nginx -d orlyne-md-v2.duckdns.org --non-interactive --agree-tos --register-unsafely-without-email || true
+            # ==================== SSL CERTBOT (ONLY IF NOT EXISTS) ====================
+            if [ ! -d /etc/letsencrypt/live/orlyne-md-v2.duckdns.org ]; then
+              echo '🔒 Installing SSL certificate...'
+              if ! command -v certbot &> /dev/null; then
+                apt install -y certbot python3-certbot-nginx
+              fi
+              certbot --nginx -d orlyne-md-v2.duckdns.org --non-interactive --agree-tos --register-unsafely-without-email || true
+            fi
             
-            # Create directories
-            mkdir -p /var/www/orlyne-md-v2/{accounts,data,temp,public,logs}
+            # ==================== FIREWALL (ONLY IF NOT CONFIGURED) ====================
+            if ! ufw status | grep -q "80/tcp"; then
+              echo '🔥 Configuring firewall...'
+              ufw allow 22,80,443,3421/tcp
+              echo 'y' | ufw enable || true
+            fi
           "
 
       - name: Deploy files
@@ -101,35 +111,26 @@ jobs:
             --exclude 'temp' \
             ./ root@84.247.177.39:/var/www/orlyne-md-v2/
 
-      - name: Install dependencies and start bot
+      - name: Install dependencies and restart bot
         run: |
           sshpass -p 'Djabir123' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
             cd /var/www/orlyne-md-v2
             
-            # Install dependencies
+            # Install/update dependencies
             npm install --production
             
-            # Stop existing bot if running
-            pm2 stop orlyne-md-v2 || true
-            pm2 delete orlyne-md-v2 || true
-            
-            # Start bot with PM2
-            pm2 start index.js --name orlyne-md-v2
+            # Restart bot (NO STOP, just restart)
+            pm2 restart orlyne-md-v2 || pm2 start index.js --name orlyne-md-v2
             
             # Save PM2 configuration
             pm2 save
-            pm2 startup systemd | grep -v 'sudo' | bash || true
-            
-            # Configure firewall
-            ufw allow 22,80,443,3421/tcp
-            echo 'y' | ufw enable || true
             
             echo '✅ Deployment completed!'
           "
 
       - name: Verify deployment
         run: |
-          sleep 10
+          sleep 5
           echo "🔍 Verifying..."
           curl -s https://orlyne-md-v2.duckdns.org/health || echo "⚠️ Health check pending"
           echo ""
