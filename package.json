@@ -1,0 +1,34 @@
+{
+  "name": "MARIA-MD",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp basé sur Baileys avec chargement dynamique des commandes et connexion via API REST avec pairing code.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.2",
+    "chalk": "^5.6.2",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "form-data": "^4.0.2",
+    "fs": "^0.0.1-security",
+    "javascript-obfuscator": "^4.0.0",
+    "jimp": "^1.6.0",
+    "moment-timezone": "^0.6.0",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "pino": "^10.3.1",
+    "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.32.6",
+    "wa-sticker-formatter": "^4.4.4",
+    "yt-search": "^2.12.0",
+    "ytdl-core": "^4.11.5"
+  }
+}
