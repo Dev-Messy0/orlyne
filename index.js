@@ -221,7 +221,7 @@ async function startUserBot(phoneNumber, isPairing = false) {
         },
     });
 
-    dvmsy.public = false,
+    dvmsy.public = true,
     tempDvmsys[sessionName] = dvmsy;
     store.bind(dvmsy.ev);
 
