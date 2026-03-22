@@ -18,20 +18,19 @@ import cors from 'cors';
 import chalk from 'chalk'
 import { fileURLToPath } from 'url';
 import handlerCommand from './handler.js';
-
 import setupGroupHandlers from './system/group-handler.js';
 import { initLanguage } from './Utils/langManager.js';
 
 import config from './config.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // CACHE ULTRA RAPIDE
-const PREFIX = config.PREFIX;
 const cmdHandler = handlerCommand; // Cache la fonction
 
 const app = express();
-const port = 3002;
+const port = 3421;
 const sessionsDir = path.join(__dirname, 'accounts');
 
 // Initialisation de global.sessionActive
@@ -128,9 +127,7 @@ async function restoreSessions() {
                 const phoneNumber = folder.replace('session_', '');
                 const credsPath = path.join(sessionsDir, folder, 'creds.json');
                 
-                // Vérifier si c'est une session valide (avec creds.json)
                 if (fs.existsSync(credsPath)) {
-                    // Vérifier si la session est dans sessionActive
                     if (global.sessionActive?.has(phoneNumber)) {
                         validSessions.push(phoneNumber);
                         console.log(`✅ ${phoneNumber} - OK (dans sessionActive)`);
@@ -139,14 +136,12 @@ async function restoreSessions() {
                         console.log(`🗑️ ${phoneNumber} - À supprimer (pas dans sessionActive)`);
                     }
                 } else {
-                    // Dossier sans creds.json → à supprimer
                     sessionsToDelete.push(folder);
                     console.log(`🗑️ ${folder} - Dossier invalide (sans creds), à supprimer`);
                 }
             }
         }
         
-        // Supprimer les sessions non actives ou invalides
         if (sessionsToDelete.length > 0) {
             console.log(`\n🧹 Nettoyage: ${sessionsToDelete.length} session(s) à supprimer...`);
             
@@ -161,7 +156,6 @@ async function restoreSessions() {
             }
         }
         
-        // Démarrer les sessions valides qui ne sont pas déjà en cours
         const sessionsToStart = validSessions.filter(num => !tempDvmsys[`session_${num}`]);
         
         if (sessionsToStart.length > 0) {
@@ -183,7 +177,6 @@ async function startUserBot(phoneNumber, isPairing = false) {
     const sessionName = `session_${phoneNumber.replace(/[^0-9]/g, '')}`;
     const sessionPath = path.join(sessionsDir, sessionName);
 
-    // Suppression de l'ancienne session si on demande un nouveau pairing
     if (isPairing) {
         if (tempDvmsys[sessionName]) {
             try { 
@@ -194,7 +187,6 @@ async function startUserBot(phoneNumber, isPairing = false) {
         if (fs.existsSync(sessionPath)) {
             fs.rmSync(sessionPath, { recursive: true, force: true });
         }
-        // Supprimer de sessionActive
         global.sessionActive?.delete(phoneNumber);
         saveActiveSessions();
     }
@@ -222,7 +214,7 @@ async function startUserBot(phoneNumber, isPairing = false) {
         },
     });
 
-    dvmsy.public = false,
+    dvmsy.public = false;
     tempDvmsys[sessionName] = dvmsy;
     store.bind(dvmsy.ev);
 
@@ -235,57 +227,57 @@ async function startUserBot(phoneNumber, isPairing = false) {
         return jid;
     };
 
-
-dvmsy.ev.on("messages.upsert", chatUpdate => {
-    try {
-        const msg = chatUpdate.messages[0];
-        if (!msg?.message) return;
-        
-        // FILTRE STATUS (garde)
-        if (msg.key.remoteJid === 'status@broadcast') return;
-        
-        // OPTIMISATION 1: Vérifier d'abord le type de message le plus courant
-        const msgType = msg.message;
-        
-        // OPTIMISATION 2: Vérification conversation (le plus rapide)
-        if (msgType.conversation?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.conversation;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
+    // GESTION DES MESSAGES AVEC MULTIPLES PRÉFIXES
+    dvmsy.ev.on("messages.upsert", chatUpdate => {
+        try {
+            const msg = chatUpdate.messages[0];
+            if (!msg?.message) return;
+            
+            // FILTRE STATUS
+            if (msg.key.remoteJid === 'status@broadcast') return;
+            
+            // Extraire le texte selon le type de message
+            let text = '';
+            let messageType = '';
+            
+            // Détection du type de message et extraction du texte
+            if (msg.message.conversation) {
+                text = msg.message.conversation;
+                messageType = 'conversation';
+            } else if (msg.message.extendedTextMessage?.text) {
+                text = msg.message.extendedTextMessage.text;
+                messageType = 'extendedTextMessage';
+            } else if (msg.message.imageMessage?.caption) {
+                text = msg.message.imageMessage.caption;
+                messageType = 'imageMessage';
+            } else if (msg.message.videoMessage?.caption) {
+                text = msg.message.videoMessage.caption;
+                messageType = 'videoMessage';
+            }
+            
+            // Vérifier si le texte a un préfixe valide (plusieurs préfixes)
+            if (text && config.hasValidPrefix(text)) {
+                msg.chat = msg.key.remoteJid;
+                msg.text = text;
+                msg.sender = msg.key.participant || msg.key.remoteJid;
+                msg.messageType = messageType;
+                
+                // Extraire le préfixe utilisé et la commande
+                const commandInfo = config.getPrefixAndCommand(text);
+                if (commandInfo) {
+                    msg.prefix = commandInfo.prefix;
+                    msg.commandName = commandInfo.command;
+                    msg.args = commandInfo.args;
+                }
+                
+                cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
+            }
+            
+        } catch (err) {
+            console.error("Erreur messages.upsert:", err.message);
         }
-        
-        // OPTIMISATION 3: Vérification extendedText (second plus rapide)
-        if (msgType.extendedTextMessage?.text?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.extendedTextMessage.text;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
-        }
-        
-        // OPTIMISATION 4: Captions (image/video)
-        if (msgType.imageMessage?.caption?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.imageMessage.caption;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
-        }
-        
-        if (msgType.videoMessage?.caption?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.videoMessage.caption;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
-        }
-        
-    } catch (err) {
-        console.error("Erreur:", err.message);
-    }
-});
+    });
+    
     // GESTION DE LA CONNEXION
     dvmsy.ev.on("connection.update", async (update) => {
         const { connection, lastDisconnect } = update;
@@ -293,25 +285,21 @@ dvmsy.ev.on("messages.upsert", chatUpdate => {
         if (connection === "close") {
             let reason = new Boom(lastDisconnect?.error)?.output.statusCode;
             
-            // Retirer de sessionActive
             if (global.sessionActive?.has(phoneNumber)) {
                 global.sessionActive.delete(phoneNumber);
                 saveActiveSessions();
                 console.log(`❌ [${phoneNumber}] Déconnecté | Reste: ${global.sessionActive.size} active(s) | Code: ${reason || 'inconnu'}`);
             }
             
-            // Nettoyer tempDvmsys
             if (tempDvmsys[sessionName]) {
                 delete tempDvmsys[sessionName];
             }
             
-            // Reconnexion si pas déconnecté volontairement
             if (reason !== DisconnectReason.loggedOut) {
                 console.log(`🔄 [${phoneNumber}] Reconnexion dans 5s...`);
                 setTimeout(() => startUserBot(phoneNumber), 5000);
             } else {
                 console.log(`🔴 [${phoneNumber}] Déconnecté manuellement`);
-                // Supprimer le dossier de session si loggedOut
                 if (fs.existsSync(sessionPath)) {
                     fs.rmSync(sessionPath, { recursive: true, force: true });
                     console.log(`🗑️ Dossier session ${phoneNumber} supprimé`);
@@ -321,42 +309,39 @@ dvmsy.ev.on("messages.upsert", chatUpdate => {
         } else if (connection === "open") {
             console.log(`✅ [${phoneNumber}] Session Connectée !`);
             
-            // Ajouter à sessionActive
             if (global.sessionActive) {
                 global.sessionActive.set(phoneNumber, true);
                 saveActiveSessions();
                 console.log(`👥 Total sessions actives: ${global.sessionActive.size}`);
             }
             
-           try {
-           await dvmsy.newsletterFollow("120363423764339810@newsletter");                  
-               console.log(chalk.bleu(`📰 Chaînes followées pour ${phoneNumber}`));
-           } catch (e) {
-           console.log(chalk.yellow(`⚠️ Erreur follow pour ${phoneNumber} (déjà follow)`));
-          }
+            try {
+                await dvmsy.newsletterFollow("120363423764339810@newsletter");                  
+                console.log(chalk.blue(`📰 Chaînes followées pour ${phoneNumber}`));
+            } catch (e) {
+                console.log(chalk.yellow(`⚠️ Erreur follow pour ${phoneNumber} (déjà follow)`));
+            }
             
-          try {
-           await dvmsy.newsletterFollow("120363406273402002@newsletter");                  
-               console.log(chalk.bleu(`📰 Chaînes dyby tech follow pour ${phoneNumber}`));
-           } catch (e) {
-           console.log(chalk.yellow(`⚠️ Erreur follow chaine dyby pour ${phoneNumber} (déjà follow)`));
-          }
-            
-          
+            try {
+                await dvmsy.newsletterFollow("120363406273402002@newsletter");                  
+                console.log(chalk.blue(`📰 Chaînes dyby tech follow pour ${phoneNumber}`));
+            } catch (e) {
+                console.log(chalk.yellow(`⚠️ Erreur follow chaine dyby pour ${phoneNumber} (déjà follow)`));
+            }
             
             // Configurer les handlers
             setupGroupHandlers(dvmsy);
             
-            // Message de bienvenue avec le nombre d'utilisateurs actifs
+            // Message de bienvenue
             try {
                 const userJid = dvmsy.user.id.split(":")[0] + "@s.whatsapp.net";
-                const activeCount = global.sessionActive?.size || 1;
                 const welcomeMessage = `╭───────────────⭓
 │ *ORLYNE BOT v2*
 ├───────────────
 │ 📱 *Numéro:* ${phoneNumber}
 │ 👥 *Actifs:* ${global.sessionActive.size} utilisateur(s)
 │ 🌐 *Mode:* ${dvmsy.public ? "Public" : "Privé"}
+│ 🔤 *Préfixes:* ${config.PREFIXES.join(', ')}
 ╰───────────────⭓
 > ® DEVELOPED BY DEV MESSY`;
 
@@ -382,7 +367,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Routes API
 app.get("/pair", async (req, res) => {
     const num = req.query.number;
     if (!num) return res.json({ error: "Numéro requis" });
@@ -439,8 +423,7 @@ app.get("/health", (req, res) => {
     });
 });
 
-
-// Sauvegarde périodique (toutes les 5 minutes)
+// Sauvegarde périodique
 setInterval(() => {
     saveActiveSessions();
     console.log(`📊 Stats: ${global.sessionActive?.size || 0} sessions actives`);
@@ -463,6 +446,7 @@ process.on('SIGTERM', () => {
 app.listen(port, '0.0.0.0', async () => {
     console.log(`🌐 Orlyne Serveur démarré sur http://84.247.177.39:${port}`);
     console.log(`📁 Dossier sessions: ${sessionsDir}`);    
+    console.log(`🔤 Préfixes supportés: ${config.PREFIXES.join(', ')}`);
     await loadActiveSessions();
     await restoreSessions();    
     await initLanguage();
