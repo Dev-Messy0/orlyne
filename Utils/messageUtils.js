@@ -9,30 +9,41 @@ export function getMessageInfo(m, dvmsy) {
         if (!m) return { body: '', sender: '', pushName: '' };
         if (!m.message) return { body: '', sender: m.key?.participant || m.key?.remoteJid || '', pushName: m.pushName || '' };
         
-        const messageType = m.message ? Object.keys(m.message)[0] : 'unknown';
+        // Filtrer les messages vides ou problématiques
+        const messageKeys = Object.keys(m.message);
+        if (messageKeys.length === 0) return { body: '', sender: '', pushName: '' };
+        
+        const messageType = messageKeys[0];
         
         let body = '';
         let pushName = m.pushName || '';
         
         const msgContent = m.message[messageType];
-        if (!msgContent) return { body: '', sender: m.key?.participant || m.key?.remoteJid || '', pushName };
+        if (!msgContent || typeof msgContent !== 'object') {
+            return { body: '', sender: m.key?.participant || m.key?.remoteJid || '', pushName };
+        }
         
-        if (messageType === 'conversation') {
+        if (messageType === 'conversation' && msgContent) {
             body = msgContent || '';
-        } else if (messageType === 'extendedTextMessage') {
-            body = msgContent?.text || '';
-        } else if (messageType === 'imageMessage') {
-            body = msgContent?.caption || '';
-        } else if (messageType === 'videoMessage') {
-            body = msgContent?.caption || '';
-        } else if (messageType === 'documentMessage') {
-            body = msgContent?.caption || '';
+        } else if (messageType === 'extendedTextMessage' && msgContent.text) {
+            body = msgContent.text || '';
+        } else if (messageType === 'imageMessage' && msgContent.caption) {
+            body = msgContent.caption || '';
+        } else if (messageType === 'videoMessage' && msgContent.caption) {
+            body = msgContent.caption || '';
+        } else if (messageType === 'documentMessage' && msgContent.caption) {
+            body = msgContent.caption || '';
+        }
+        
+        // Si body est null ou undefined, retourner vide
+        if (body === null || body === undefined) {
+            body = '';
         }
         
         const sender = m.key?.participant || m.key?.remoteJid || '';
         
         return {
-            body: body || '',
+            body: body,
             sender,
             pushName: pushName || sender?.split('@')[0] || '',
             messageType,
