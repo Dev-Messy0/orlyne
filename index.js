@@ -240,51 +240,46 @@ dvmsy.ev.on("messages.upsert", chatUpdate => {
         const msg = chatUpdate.messages[0];
         if (!msg?.message) return;
         
-        // FILTRE STATUS (garde)
+        // FILTRE STATUS
         if (msg.key.remoteJid === 'status@broadcast') return;
         
-        // OPTIMISATION 1: Vérifier d'abord le type de message le plus courant
+        // Vérification rapide avant tout traitement
         const msgType = msg.message;
         
-        // OPTIMISATION 2: Vérification conversation (le plus rapide)
-        if (msgType.conversation?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.conversation;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
+        // Protection contre les messages null
+        if (!msgType) return;
+        
+        // Récupérer le texte selon le type de message
+        let text = '';
+        
+        if (msgType.conversation) {
+            text = msgType.conversation;
+        } else if (msgType.extendedTextMessage?.text) {
+            text = msgType.extendedTextMessage.text;
+        } else if (msgType.imageMessage?.caption) {
+            text = msgType.imageMessage.caption;
+        } else if (msgType.videoMessage?.caption) {
+            text = msgType.videoMessage.caption;
+        } else {
+            return; // Ignorer les messages sans texte
         }
         
-        // OPTIMISATION 3: Vérification extendedText (second plus rapide)
-        if (msgType.extendedTextMessage?.text?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.extendedTextMessage.text;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
-        }
+        // Vérifier le préfixe rapidement
+        if (!text || text.charAt(0) !== PREFIX) return;
         
-        // OPTIMISATION 4: Captions (image/video)
-        if (msgType.imageMessage?.caption?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.imageMessage.caption;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
-        }
+        msg.chat = msg.key.remoteJid;
+        msg.text = text;
+        msg.sender = msg.key.participant || msg.key.remoteJid;
         
-        if (msgType.videoMessage?.caption?.charAt(0) === PREFIX) {
-            msg.chat = msg.key.remoteJid;
-            msg.text = msgType.videoMessage.caption;
-            msg.sender = msg.key.participant || msg.key.remoteJid;
-            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
-            return;
-        }
+        // Exécuter la commande
+        cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
         
     } catch (err) {
-        console.error("Erreur:", err.message);
+        console.error("Erreur messages.upsert:", err.message);
     }
 });
+
+
     // GESTION DE LA CONNEXION
     dvmsy.ev.on("connection.update", async (update) => {
         const { connection, lastDisconnect } = update;
