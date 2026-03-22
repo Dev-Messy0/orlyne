@@ -18,6 +18,7 @@ import cors from 'cors';
 import chalk from 'chalk'
 import { fileURLToPath } from 'url';
 import handlerCommand from './handler.js';
+import { smsg } from './Utils/func.js';
 import setupGroupHandlers from './system/group-handler.js';
 import { initLanguage } from './Utils/langManager.js';
 
@@ -30,7 +31,7 @@ const PREFIX = config.PREFIX;
 const cmdHandler = handlerCommand; // Cache la fonction
 
 const app = express();
-const port = 3421;
+const port = 3002;
 const sessionsDir = path.join(__dirname, 'accounts');
 
 // Initialisation de global.sessionActive
@@ -221,7 +222,7 @@ async function startUserBot(phoneNumber, isPairing = false) {
         },
     });
 
-    dvmsy.public = true,
+    dvmsy.public = false,
     tempDvmsys[sessionName] = dvmsy;
     store.bind(dvmsy.ev);
 
@@ -240,46 +241,51 @@ dvmsy.ev.on("messages.upsert", chatUpdate => {
         const msg = chatUpdate.messages[0];
         if (!msg?.message) return;
         
-        // FILTRE STATUS
+        // FILTRE STATUS (garde)
         if (msg.key.remoteJid === 'status@broadcast') return;
         
-        // Vérification rapide avant tout traitement
+        // OPTIMISATION 1: Vérifier d'abord le type de message le plus courant
         const msgType = msg.message;
         
-        // Protection contre les messages null
-        if (!msgType) return;
-        
-        // Récupérer le texte selon le type de message
-        let text = '';
-        
-        if (msgType.conversation) {
-            text = msgType.conversation;
-        } else if (msgType.extendedTextMessage?.text) {
-            text = msgType.extendedTextMessage.text;
-        } else if (msgType.imageMessage?.caption) {
-            text = msgType.imageMessage.caption;
-        } else if (msgType.videoMessage?.caption) {
-            text = msgType.videoMessage.caption;
-        } else {
-            return; // Ignorer les messages sans texte
+        // OPTIMISATION 2: Vérification conversation (le plus rapide)
+        if (msgType.conversation?.charAt(0) === PREFIX) {
+            msg.chat = msg.key.remoteJid;
+            msg.text = msgType.conversation;
+            msg.sender = msg.key.participant || msg.key.remoteJid;
+            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
+            return;
         }
         
-        // Vérifier le préfixe rapidement
-        if (!text || text.charAt(0) !== PREFIX) return;
+        // OPTIMISATION 3: Vérification extendedText (second plus rapide)
+        if (msgType.extendedTextMessage?.text?.charAt(0) === PREFIX) {
+            msg.chat = msg.key.remoteJid;
+            msg.text = msgType.extendedTextMessage.text;
+            msg.sender = msg.key.participant || msg.key.remoteJid;
+            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
+            return;
+        }
         
-        msg.chat = msg.key.remoteJid;
-        msg.text = text;
-        msg.sender = msg.key.participant || msg.key.remoteJid;
+        // OPTIMISATION 4: Captions (image/video)
+        if (msgType.imageMessage?.caption?.charAt(0) === PREFIX) {
+            msg.chat = msg.key.remoteJid;
+            msg.text = msgType.imageMessage.caption;
+            msg.sender = msg.key.participant || msg.key.remoteJid;
+            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
+            return;
+        }
         
-        // Exécuter la commande
-        cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
+        if (msgType.videoMessage?.caption?.charAt(0) === PREFIX) {
+            msg.chat = msg.key.remoteJid;
+            msg.text = msgType.videoMessage.caption;
+            msg.sender = msg.key.participant || msg.key.remoteJid;
+            cmdHandler(dvmsy, msg, msg, chatUpdate, undefined);
+            return;
+        }
         
     } catch (err) {
-        console.error("Erreur messages.upsert:", err.message);
+        console.error("Erreur:", err.message);
     }
 });
-
-
     // GESTION DE LA CONNEXION
     dvmsy.ev.on("connection.update", async (update) => {
         const { connection, lastDisconnect } = update;
