@@ -104,12 +104,22 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
         if (!m?.key?.remoteJid) return;
         if (!m.message) return;
         
+        // Vérification supplémentaire pour éviter l'erreur "Cannot read properties of null"
+        if (!m.message.conversation && !m.message.extendedTextMessage && !m.message.imageMessage && !m.message.videoMessage) {
+            return;
+        }
+        
         // Initialiser m.chat pour la compatibilité
         m.chat = m.key.remoteJid;
         
         // ÉTAPE 1: Informations de base du message
         const messageInfo = getMessageInfo(m, dvmsy);
         const { body, sender, pushName } = messageInfo;
+        
+        // Protection si body est null ou undefined
+        if (body === null || body === undefined) {
+            return;
+        }
         
         // JID et numéro de l'expéditeur
         const senderJid = m.key.participant || m.key.remoteJid;
@@ -168,16 +178,13 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
             ...messageInfo,
             ...groupInfo,
             ...permissions,
-            // Infos de base (surcharge pour sécurité)
             sender: senderJid,
             senderNumber: senderNumber,
             pushName: pushName || senderNumber,
             isOwner: isOwner,
             isGroup: isGroup,
-            // Commande
             command: command,
             args: args,
-            // Configuration
             prefix: config.PREFIX,
             config: config
         };
@@ -188,7 +195,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
         let commandExecuted = false;
         
         switch(command) {
-            // ========== COMMANDES GROUPE ==========
             case 'tagall':
                 await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_tagall || "📢");
                 if (!isGroup) { 
@@ -345,7 +351,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== NOUVELLES COMMANDES SETTINGS ==========
             case 'antispam':
                 await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_antispam || "🚫");
                 if (!isGroup) { 
@@ -386,7 +391,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== COMMANDES GÉNÉRALES ==========
             case 'ping':
                 await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_ping || "🏓");
                 await ping(fullMessage, dvmsy);
@@ -444,7 +448,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== COMMANDES TOOLS ==========
             case 'url':
             case 'lien':
             case 'upload':
@@ -509,7 +512,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== COMMANDES DOWNLOAD ==========
             case 'youtube':
             case 'yt':
             case 'video':
@@ -558,7 +560,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== COMMANDES OWNER ==========
             case 'clearchat':
             case 'cc':
             case 'clear':
@@ -574,7 +575,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== COMMANDES CONVERSION ==========
             case 'to-img':
             case 'toimage':
             case 'imagedesticker':
@@ -625,7 +625,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
             
-            // ========== COMMANDES LANGUE ==========
             case 'setlang':
             case 'language':
             case 'langue':
@@ -634,7 +633,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
     
-            // ========== COMMANDES MODE ==========
             case "mode-pub":
             case "public":
             case "mode-public":
@@ -668,7 +666,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 commandExecuted = true;
                 break;
 
-            // ========== COMMANDE INCONNUE ==========
             default:
                 if (command) {
                     await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_unknown || "❓");
@@ -676,7 +673,6 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
                 }
         }
 
-        // Réaction finale si commande exécutée (optionnel)
         if (commandExecuted) {
             await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_success || "✅");
         }
@@ -684,16 +680,14 @@ export default async function handlerCommand(dvmsy, m, msg, chatUpdate, options)
     } catch (error) {
         console.error('❌ Erreur dans handlerCommand:', error);
         
-        // Réaction d'erreur
         try {
-            await sendReaction(dvmsy, m.chat, m.key, msgLang.reaction_error || "❌");
+            await sendReaction(dvmsy, m.chat, m.key, "❌");
         } catch (e) {}
         
-        // Envoi du message d'erreur (une seule fois)
         try {
             if (m?.chat) {
                 await dvmsy.sendMessage(m.chat, { 
-                    text: `❌ Erreur : ${error.message || 'Une erreur est survenue lors de l\'exécution de la commande.'}`
+                    text: `❌ Erreur : ${error.message || 'Une erreur est survenue.'}`
                 });
             }
         } catch (sendError) {
