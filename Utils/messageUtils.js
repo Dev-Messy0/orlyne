@@ -7,49 +7,35 @@ import config from '../config.js';
 export function getMessageInfo(m, dvmsy) {
     try {
         if (!m) return { body: '', sender: '', pushName: '' };
-        if (!m.message) return { body: '', sender: m.key?.participant || m.key?.remoteJid || '', pushName: m.pushName || '' };
         
-        // Filtrer les messages vides ou problématiques
-        const messageKeys = Object.keys(m.message);
-        if (messageKeys.length === 0) return { body: '', sender: '', pushName: '' };
-        
-        const messageType = messageKeys[0];
+        const messageType = m.message ? 
+            Object.keys(m.message)[0] : 'unknown';
         
         let body = '';
         let pushName = m.pushName || '';
         
-        const msgContent = m.message[messageType];
-        if (!msgContent || typeof msgContent !== 'object') {
-            return { body: '', sender: m.key?.participant || m.key?.remoteJid || '', pushName };
+        if (messageType === 'conversation') {
+            body = m.message.conversation;
+        } else if (messageType === 'extendedTextMessage') {
+            body = m.message.extendedTextMessage.text;
+        } else if (messageType === 'imageMessage') {
+            body = m.message.imageMessage.caption || '';
+        } else if (messageType === 'videoMessage') {
+            body = m.message.videoMessage.caption || '';
+        } else if (messageType === 'documentMessage') {
+            body = m.message.documentMessage.caption || '';
         }
         
-        if (messageType === 'conversation' && msgContent) {
-            body = msgContent || '';
-        } else if (messageType === 'extendedTextMessage' && msgContent.text) {
-            body = msgContent.text || '';
-        } else if (messageType === 'imageMessage' && msgContent.caption) {
-            body = msgContent.caption || '';
-        } else if (messageType === 'videoMessage' && msgContent.caption) {
-            body = msgContent.caption || '';
-        } else if (messageType === 'documentMessage' && msgContent.caption) {
-            body = msgContent.caption || '';
-        }
-        
-        // Si body est null ou undefined, retourner vide
-        if (body === null || body === undefined) {
-            body = '';
-        }
-        
-        const sender = m.key?.participant || m.key?.remoteJid || '';
+        const sender = m.key.participant || m.key.remoteJid;
         
         return {
-            body: body,
+            body,
             sender,
-            pushName: pushName || sender?.split('@')[0] || '',
+            pushName,
             messageType,
-            isGroup: m.key?.remoteJid?.endsWith('@g.us') || false,
+            isGroup: m.key.remoteJid.endsWith('@g.us'),
             timestamp: m.messageTimestamp,
-            chat: m.key?.remoteJid || ''
+            chat: m.key.remoteJid
         };
     } catch (error) {
         console.error('Erreur getMessageInfo:', error);
@@ -63,10 +49,10 @@ export function getMessageInfo(m, dvmsy) {
 export function checkIsOwner(senderJid, senderNumber, m, dvmsy) {
     const ownerNums = [config.OWNER_NUMBER].filter(Boolean);
     
-    return ownerNums.includes(senderNumber) || 
-           config.OWNERS.includes(senderJid) || 
-           m?.key?.fromMe || 
-           (dvmsy?.user && senderJid === dvmsy.user.id);
+    return ownerNums.includes(senderNumber) || // Par numéro
+           config.OWNERS.includes(senderJid) || // Par JID complet
+           m?.key?.fromMe || // Message du bot lui-même
+           (dvmsy?.user && senderJid === dvmsy.user.id); // C'est le bot
 }
 
 /**
@@ -88,14 +74,19 @@ export async function getGroupInfo(m, dvmsy) {
         const metadata = await dvmsy.groupMetadata(m.key.remoteJid);
         const participants = metadata.participants || [];
         
+        // JID de l'expéditeur
         const senderJid = m.key.participant || m.key.remoteJid;
+        
+        // JID du bot
         const botJid = dvmsy.user?.id?.split(':')[0] + '@s.whatsapp.net';
         
+        // Vérifier si l'expéditeur est admin
         const senderParticipant = participants.find(p => p.id === senderJid);
         const isAdmin = senderParticipant && 
                        (senderParticipant.admin === "admin" || 
                         senderParticipant.admin === "superadmin");
         
+        // Vérifier si le bot est admin
         const botParticipant = participants.find(p => p.id === botJid);
         const isBotAdmin = botParticipant && 
                           (botParticipant.admin === "admin" || 
