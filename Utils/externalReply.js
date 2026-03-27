@@ -27,9 +27,16 @@ const messyFake = {
             itemCount: `9999999`,
             status: "INQUIRY",
             surface: "CATALOG",
-            message: `𝑂𝑅𝐿𝑌𝑁𝐸 𝑀𝐷 𝐵𝑌 𝑆𝑌𝑁𝑇𝐴𝑋𝐸`
-        }
-    }
+            message: `𝑂𝑅𝐿𝑌𝑁𝐸 𝑀𝐷 𝐵𝑌 𝑆𝑌𝑁𝑇𝐴𝑋𝐸`,
+token: "AR6xBKbXZn0Xwmu76Ksyd7rnxI+Rx87HfinVlW4lwXa6JA=="
+				}
+			},
+			contextInfo: {
+				mentionedJid: [m.sender],
+				forwardingScore: 999,
+				isForwarded: true
+			}        
+ }
 };
 
 const ReplyRafa = (teks, dvmsy, chatId) => {
