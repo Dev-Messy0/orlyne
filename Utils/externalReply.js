@@ -14,7 +14,7 @@ try {
     }
 } catch (e) {}
 
-const ReplyRafa = {
+const messyFake = {
     key: {
         fromMe: false,
         participant: "0@s.whatsapp.net",
@@ -50,4 +50,4 @@ const R = (teks, dvmsy, chatId) => {
     }, { quoted:  });
 };
 
-export { messyFake, ReplyRafa };
+export { messyFake };
