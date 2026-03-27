@@ -31,7 +31,7 @@ ${formatMessage(msg.lang_invalid, { list })}`;
             const list = getAvailableLanguages();
             return await dvmsy.sendMessage(m.chat, {
                 text: formatMessage(msg.lang_invalid, { list })
-            }, { quoted: messyFake });
+            }, { quoted: m });
         }
         
         // Sauvegarder la nouvelle langue pour cet utilisateur
@@ -47,7 +47,7 @@ ${formatMessage(msg.lang_invalid, { list })}`;
                     lang: newLangName,
                     flag: newLangFlag
                 })
-            }, { quoted: messyFake });
+            }, { quoted: m });
             
             // Réaction avec le drapeau
             await dvmsy.sendMessage(m.chat, { 
@@ -57,13 +57,13 @@ ${formatMessage(msg.lang_invalid, { list })}`;
             const msg = getMessages(userJid);
             await dvmsy.sendMessage(m.chat, { 
                 text: formatMessage(msg.error, { error: 'Impossible de sauvegarder la langue' })
-            }, { quoted: messyFake });
+            }, { quoted: m });
         }
         
     } catch (error) {
         console.error('[setlang] error:', error);
         await dvmsy.sendMessage(m.chat, { 
             text: "❌ ᴇʀʀᴇᴜʀ" 
-        }, { quoted: messyFake });
+        }, { quoted: m });
     }
 }
