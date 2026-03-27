@@ -51,9 +51,10 @@ const ReplyRafa = (teks, dvmsy, chatId, options = {}) => {
         }
     };
     
-    // Ajouter l'option edit si fournie
+    // Pour l'édition, on ne peut pas mettre contextInfo
+    // On fait deux fonctions différentes
     if (options.edit) {
-        messageOptions.edit = options.edit;
+        return dvmsy.sendMessage(chatId, { text: teks, edit: options.edit });
     }
     
     return dvmsy.sendMessage(chatId, messageOptions, { quoted: messyFake });
