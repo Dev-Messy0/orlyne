@@ -20,7 +20,7 @@ export default async function setlang(m, dvmsy) {
 
 ${formatMessage(msg.lang_invalid, { list })}`;
             
-            return await dvmsy.sendMessage(m.chat, { text }, { quoted: messyFake });
+            return await dvmsy.sendMessage(m.chat, { text }, { quoted: m });
         }
         
         const selectedLang = m.args[0].toLowerCase();
