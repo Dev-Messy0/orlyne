@@ -14,7 +14,7 @@ try {
     }
 } catch (e) {}
 
-const messyFake = {
+const ReplyRafa = {
     key: {
         fromMe: false,
         participant: "0@s.whatsapp.net",
@@ -47,7 +47,7 @@ const ReplyRafa = (teks, dvmsy, chatId) => {
                 sourceUrl: `https://www.youtube.com/@yanzmodsofficial`
             }
         }
-    }, { quoted: messyFake });
+    }, { quoted:  });
 };
 
 export { messyFake, ReplyRafa };
