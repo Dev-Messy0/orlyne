@@ -1,3 +1,4 @@
+// index.js
 import {
     makeWASocket,
     useMultiFileAuthState,
@@ -20,6 +21,7 @@ import { fileURLToPath } from 'url';
 import handlerCommand from './handler.js';
 import setupGroupHandlers from './system/group-handler.js';
 import { initLanguage } from './Utils/langManager.js';
+import { getMessageText } from './Utils/messageUtils.js';
 
 import config from './config.js';
 
@@ -192,23 +194,14 @@ async function startUserBot(phoneNumber, isPairing = false) {
     store.bind(dvmsy.ev);
 
     // TRAITEMENT DES MESSAGES
-    dvmsy.ev.on("messages.upsert", chatUpdate => {
+    dvmsy.ev.on("messages.upsert", async (chatUpdate) => {
         try {
             const msg = chatUpdate.messages[0];
             if (!msg?.message) return;
             if (msg.key.remoteJid === 'status@broadcast') return;
             
-            let text = '';
-            
-            if (msg.message.conversation) {
-                text = msg.message.conversation;
-            } else if (msg.message.extendedTextMessage?.text) {
-                text = msg.message.extendedTextMessage.text;
-            } else if (msg.message.imageMessage?.caption) {
-                text = msg.message.imageMessage.caption;
-            } else if (msg.message.videoMessage?.caption) {
-                text = msg.message.videoMessage.caption;
-            }
+            // Utiliser getMessageText pour extraire le texte
+            let text = getMessageText(msg);
             
             // Vérifier le préfixe
             if (text && (text.startsWith('.') || text.startsWith('!') || text.startsWith('/') || text.startsWith('#') || text.startsWith('?'))) {
