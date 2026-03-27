@@ -30,6 +30,7 @@ const messyFake = {
             message: `𝑂𝑅𝐿𝑌𝑁𝐸 𝑀𝐷 𝐵𝑌 𝑆𝑌𝑁𝑇𝐴𝑋𝐸`,
 token: "AR6xBKbXZn0Xwmu76Ksyd7rnxI+Rx87HfinVlW4lwXa6JA=="
 				}
+    }
 			},
 			contextInfo: {
 				mentionedJid: [m.sender],
