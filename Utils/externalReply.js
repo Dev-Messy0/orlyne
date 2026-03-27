@@ -35,8 +35,8 @@ const messyFake = {
     }
 };
 
-const ReplyRafa = (teks, dvmsy, chatId) => {
-    return dvmsy.sendMessage(chatId, {
+const ReplyRafa = (teks, dvmsy, chatId, options = {}) => {
+    const messageOptions = {
         text: teks,
         contextInfo: {
             externalAdReply: {
@@ -46,10 +46,17 @@ const ReplyRafa = (teks, dvmsy, chatId) => {
                 mediaType: 3,
                 renderLargerThumbnail: false,
                 thumbnailUrl: "https://raw.githubusercontent.com/NdikzDatabase/Database/main/Database/1771227167948-ajtucq.jpg",
-                sourceUrl: `https://whatsapp.com/channel/0029VbCFNSS0LKZFXzWMZS1w
+                sourceUrl: `https://www.youtube.com/@yanzmodsofficial`
             }
         }
-    }, { quoted: messyFake });
+    };
+    
+    // Ajouter l'option edit si fournie
+    if (options.edit) {
+        messageOptions.edit = options.edit;
+    }
+    
+    return dvmsy.sendMessage(chatId, messageOptions, { quoted: messyFake });
 };
 
 export { messyFake, ReplyRafa };
