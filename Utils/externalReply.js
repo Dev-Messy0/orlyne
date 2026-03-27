@@ -33,7 +33,7 @@ const ReplyRafa = {
     }
 };
 
-const ReplyRafa = (teks, dvmsy, chatId) => {
+const R = (teks, dvmsy, chatId) => {
     return dvmsy.sendMessage(chatId, {
         text: teks,
         contextInfo: {
