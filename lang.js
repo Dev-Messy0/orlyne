@@ -105,7 +105,14 @@ ${list}
         left_success: `👋 ɢʀᴏᴜᴘᴇ ǫᴜɪᴛᴛᴇ́ ᴀᴠᴇᴄ ꜱᴜᴄᴄᴇ̀ꜱ`,
         
         // ========== ᴄᴏᴍᴍᴀɴᴅᴇ ᴍᴇɴᴜ ==========
-        menu_title: (user, prefix, mode, active, activeEmoji, lang) => `╭──────────────╮\n┃    ᴏʀʟʏɴᴇ ᴠɪ\n╰───────────────  \n╭───────────────⊷\n│*ᴜꜱᴇʀ* : ${user}\n│*ᴘʀᴇꜰɪx* : «${prefix}»\n│*ᴍᴏᴅᴇ* : ${mode}\n│*ᴀᴄᴛɪꜰ* : ${active} ${activeEmoji}\n│*ʟᴀɴɢ* : ${lang}\n╰───────────────⊷`,
+        menu_title: (user, prefix, mode, active, activeEmoji, lang) => `╭━━━━━━━━━━━━━━━✦
+┃   ❏ ᴏʀʟʏɴᴇ ᴠɪ ❏
+╰━━━━━━━━━━━━━━━✦
+╭◇ *ᴘʀᴏꜰɪʟᴇ* ◇
+┃❍ ᴜsᴇʀ : ${user}
+┃❍ ᴘʀᴇꜰɪx : «${prefix}»
+┃❍ ᴀᴄᴛɪꜰ  : ${active}
+╰❍`,
         menu_general: `ɢᴇɴᴇʀᴀʟ`,
         menu_owner: `ᴏᴡɴᴇʀ`,
         menu_tool: `ᴛᴏᴏʟ`,
