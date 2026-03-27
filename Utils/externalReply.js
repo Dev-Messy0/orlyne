@@ -6,16 +6,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Charger l'image pour le fake message
 const imagePath = path.join(__dirname, '..', 'image', 'image1.png');
 let imageBuffer = null;
 try {
     if (fs.existsSync(imagePath)) {
         imageBuffer = fs.readFileSync(imagePath);
     }
-} catch (e) {
-    console.log('Image non trouvée pour fake message');
-}
+} catch (e) {}
 
 const messyFake = {
     key: {
@@ -35,8 +32,8 @@ const messyFake = {
     }
 };
 
-const ReplyRafa = (teks, dvmsy, chatId, options = {}) => {
-    const messageOptions = {
+const ReplyRafa = (teks, dvmsy, chatId) => {
+    return dvmsy.sendMessage(chatId, {
         text: teks,
         contextInfo: {
             externalAdReply: {
@@ -49,15 +46,7 @@ const ReplyRafa = (teks, dvmsy, chatId, options = {}) => {
                 sourceUrl: `https://www.youtube.com/@yanzmodsofficial`
             }
         }
-    };
-    
-    // Pour l'édition, on ne peut pas mettre contextInfo
-    // On fait deux fonctions différentes
-    if (options.edit) {
-        return dvmsy.sendMessage(chatId, { text: teks, edit: options.edit });
-    }
-    
-    return dvmsy.sendMessage(chatId, messageOptions, { quoted: messyFake });
+    }, { quoted: messyFake });
 };
 
 export { messyFake, ReplyRafa };
