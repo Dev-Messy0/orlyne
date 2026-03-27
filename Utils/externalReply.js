@@ -33,7 +33,7 @@ const messyFake = {
     }
 };
 
-const R = (teks, dvmsy, chatId) => {
+const R = (teks, dvmsy, chatId, m) => {  // Ajout du paramètre 'm'
     return dvmsy.sendMessage(chatId, {
         text: teks,
         contextInfo: {
@@ -47,7 +47,7 @@ const R = (teks, dvmsy, chatId) => {
                 sourceUrl: `https://www.youtube.com/@yanzmodsofficial`
             }
         }
-    }, { quoted:  });
+    }, { quoted: m });
 };
 
-export { messyFake };
+export { messyFake, R };
