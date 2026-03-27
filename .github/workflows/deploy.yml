@@ -31,25 +31,45 @@ jobs:
           sshpass -p 'Djabir123@' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
             echo '🚀 Starting deployment...'
             
+            # Créer le dossier s'il n'existe pas
+            mkdir -p /var/www/orlyne-md-v2
+            
+            # Aller dans le dossier
             cd /var/www/orlyne-md-v2
             
+            # Faire git pull si c'est un repo git, sinon cloner
+            if [ -d .git ]; then
+              echo '📦 Updating from GitHub...'
+              git pull
+            else
+              echo '📦 Cloning repository...'
+              git clone https://github.com/Dev-Messy0/orlyne-md-v2.git .
+            fi
+            
+            # Créer les dossiers nécessaires
             mkdir -p /var/www/orlyne-md-v2/{accounts,data,temp,public,logs}
             
+            # Installer Node.js 20 si nécessaire
             if ! command -v node &> /dev/null || [ \$(node -v | cut -d. -f1 | tr -d 'v') -lt 20 ]; then
+              echo '📦 Installing Node.js 20...'
               curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
               apt install -y nodejs
             fi
             
+            # Installer ffmpeg si nécessaire
             if ! command -v ffmpeg &> /dev/null; then
+              echo '🎬 Installing ffmpeg...'
               apt install -y ffmpeg
             fi
             
+            # Installer PM2 si nécessaire
             if ! command -v pm2 &> /dev/null; then
+              echo '⚙️ Installing PM2...'
               npm install -g pm2
             fi
           "
 
-      - name: Deploy files
+      - name: Deploy files (rsync)
         run: |
           sshpass -p 'Djabir123@' rsync -avz --delete \
             --exclude 'node_modules' \
@@ -59,15 +79,23 @@ jobs:
             --exclude 'temp' \
             ./ root@84.247.177.39:/var/www/orlyne-md-v2/
 
-      - name: Install dependencies and start bot
+      - name: Install dependencies and restart bot
         run: |
           sshpass -p 'Djabir123@' ssh -o StrictHostKeyChecking=no root@84.247.177.39 "
             cd /var/www/orlyne-md-v2
             
+            echo '📦 Installing dependencies...'
             npm install --production
             
+            echo '🔄 Restarting bot...'
             pm2 restart orlyne-md-v2 || pm2 start index.js --name orlyne-md-v2
             pm2 save
+            
+            echo '📊 PM2 Status:'
+            pm2 status
+            
+            echo '🌐 Testing health endpoint...'
+            curl -s http://localhost:3421/health || echo '⚠️ Health check pending'
             
             echo '✅ Deployment completed!'
           "
