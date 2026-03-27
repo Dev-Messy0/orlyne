@@ -27,19 +27,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // CACHE ULTRA RAPIDE
-const cmdHandler = handlerCommand; // Cache la fonction
+const cmdHandler = handlerCommand;
 
 const app = express();
 const port = 3421;
 const sessionsDir = path.join(__dirname, 'accounts');
+const welcomeStatusFile = path.join(__dirname, 'data', 'welcome_status.json');
 
 // Initialisation de global.sessionActive
 if (!global.sessionActive) {
     global.sessionActive = new Map();
 }
 
-// Création du dossier de stockage si absent
+// Création des dossiers
 if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
+if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 
 let tempDvmsys = {};
 global.msgStore = {};
@@ -60,6 +62,24 @@ const store = {
         });
     }
 };
+
+// Gestion du statut d'envoi du message de bienvenue
+function loadWelcomeStatus() {
+    try {
+        if (fs.existsSync(welcomeStatusFile)) {
+            return JSON.parse(fs.readFileSync(welcomeStatusFile, 'utf8'));
+        }
+    } catch (error) {}
+    return {};
+}
+
+function saveWelcomeStatus(status) {
+    try {
+        const dataDir = path.join(__dirname, 'data');
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(welcomeStatusFile, JSON.stringify(status, null, 2));
+    } catch (error) {}
+}
 
 // Fonction pour sauvegarder l'état des sessions actives
 function saveActiveSessions() {
@@ -233,14 +253,11 @@ async function startUserBot(phoneNumber, isPairing = false) {
             const msg = chatUpdate.messages[0];
             if (!msg?.message) return;
             
-            // FILTRE STATUS
             if (msg.key.remoteJid === 'status@broadcast') return;
             
-            // Extraire le texte selon le type de message
             let text = '';
             let messageType = '';
             
-            // Détection du type de message et extraction du texte
             if (msg.message.conversation) {
                 text = msg.message.conversation;
                 messageType = 'conversation';
@@ -255,14 +272,12 @@ async function startUserBot(phoneNumber, isPairing = false) {
                 messageType = 'videoMessage';
             }
             
-            // Vérifier si le texte a un préfixe valide (plusieurs préfixes)
             if (text && config.hasValidPrefix(text)) {
                 msg.chat = msg.key.remoteJid;
                 msg.text = text;
                 msg.sender = msg.key.participant || msg.key.remoteJid;
                 msg.messageType = messageType;
                 
-                // Extraire le préfixe utilisé et la commande
                 const commandInfo = config.getPrefixAndCommand(text);
                 if (commandInfo) {
                     msg.prefix = commandInfo.prefix;
@@ -329,13 +344,16 @@ async function startUserBot(phoneNumber, isPairing = false) {
                 console.log(chalk.yellow(`⚠️ Erreur follow chaine dyby pour ${phoneNumber} (déjà follow)`));
             }
             
-            // Configurer les handlers
             setupGroupHandlers(dvmsy);
             
-            // Message de bienvenue
+            // Message de bienvenue - envoyé une seule fois par numéro
             try {
                 const userJid = dvmsy.user.id.split(":")[0] + "@s.whatsapp.net";
-                const welcomeMessage = `╭───────────────⭓
+                const welcomeStatus = loadWelcomeStatus();
+                const welcomeKey = `welcome_${phoneNumber}`;
+                
+                if (!welcomeStatus[welcomeKey]) {
+                    const welcomeMessage = `╭───────────────⭓
 │ *ORLYNE BOT v2*
 ├───────────────
 │ 📱 *Numéro:* ${phoneNumber}
@@ -345,11 +363,17 @@ async function startUserBot(phoneNumber, isPairing = false) {
 ╰───────────────⭓
 > ® DEVELOPED BY DEV MESSY`;
 
-                await dvmsy.sendMessage(userJid, {
-                    image: { url: "./image/image1.png" },
-                    caption: welcomeMessage
-                });
-                console.log(`📨 Message de bienvenue envoyé à ${phoneNumber}`);
+                    await dvmsy.sendMessage(userJid, {
+                        image: { url: "./image/image1.png" },
+                        caption: welcomeMessage
+                    });
+                    
+                    welcomeStatus[welcomeKey] = Date.now();
+                    saveWelcomeStatus(welcomeStatus);
+                    console.log(`📨 Message de bienvenue envoyé à ${phoneNumber}`);
+                } else {
+                    console.log(`📨 Message déjà envoyé pour ${phoneNumber}, ignoré`);
+                }
             } catch (e) {
                 console.error(`❌ Erreur envoi message bienvenue:`, e.message);
             }
