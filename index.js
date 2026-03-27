@@ -247,7 +247,7 @@ async function startUserBot(phoneNumber, isPairing = false) {
         return jid;
     };
 
-    // GESTION DES MESSAGES AVEC MULTIPLES PRÉFIXES
+    // GESTION DES MESSAGES (INDÉPENDANT DU WELCOME)
     dvmsy.ev.on("messages.upsert", chatUpdate => {
         try {
             const msg = chatUpdate.messages[0];
@@ -346,7 +346,7 @@ async function startUserBot(phoneNumber, isPairing = false) {
             
             setupGroupHandlers(dvmsy);
             
-            // Message de bienvenue - envoyé une seule fois par numéro
+            // ENVOI DU WELCOME (UNE SEULE FOIS PAR NUMÉRO)
             try {
                 const userJid = dvmsy.user.id.split(":")[0] + "@s.whatsapp.net";
                 const welcomeStatus = loadWelcomeStatus();
