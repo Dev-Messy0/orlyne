@@ -2,38 +2,57 @@
 import config from '../config.js';
 
 /**
+ * Extrait le texte du message quel que soit son type
+ */
+export function getMessageText(m) {
+    if (!m || !m.message) return '';
+    
+    const mtype = Object.keys(m.message)[0];
+    
+    const body = (
+        mtype === "conversation" ? m.message.conversation || "[Conversation]" :
+        mtype === "imageMessage" ? m.message.imageMessage.caption || "[Image]" :
+        mtype === "videoMessage" ? m.message.videoMessage.caption || "[Video]" :
+        mtype === "audioMessage" ? m.message.audioMessage.caption || "[Audio]" :
+        mtype === "stickerMessage" ? m.message.stickerMessage.caption || "[Sticker]" :
+        mtype === "documentMessage" ? m.message.documentMessage.fileName || "[Document]" :
+        mtype === "contactMessage" ? "[Contact]" :
+        mtype === "locationMessage" ? m.message.locationMessage.name || "[Location]" :
+        mtype === "liveLocationMessage" ? "[Live Location]" :
+        mtype === "extendedTextMessage" ? m.message.extendedTextMessage.text || "[Extended Text]" :
+        mtype === "buttonsResponseMessage" ? m.message.buttonsResponseMessage.selectedButtonId || "[Button Response]" :
+        mtype === "listResponseMessage" ? m.message.listResponseMessage.singleSelectReply.selectedRowId || "[List Response]" :
+        mtype === "templateButtonReplyMessage" ? m.message.templateButtonReplyMessage.selectedId || "[Template Button Reply]" :
+        mtype === "pollCreationMessage" ? "[Poll Creation]" :
+        mtype === "reactionMessage" ? m.message.reactionMessage.text || "[Reaction]" :
+        mtype === "ephemeralMessage" ? "[Ephemeral]" :
+        mtype === "viewOnceMessage" ? "[View Once]" :
+        mtype === "productMessage" ? m.message.productMessage.product?.name || "[Product]" :
+        mtype === "messageContextInfo" ? m.message.buttonsResponseMessage?.selectedButtonId || m.message.listResponseMessage?.singleSelectReply.selectedRowId || "[Message Context]" :
+        "[Unknown Type]"
+    );
+    
+    return body;
+}
+
+/**
  * Extrait les informations de base du message
  */
 export function getMessageInfo(m, dvmsy) {
     try {
         if (!m) return { body: '', sender: '', pushName: '' };
         
-        const messageType = m.message ? 
-            Object.keys(m.message)[0] : 'unknown';
-        
-        let body = '';
-        let pushName = m.pushName || '';
-        
-        if (messageType === 'conversation') {
-            body = m.message.conversation;
-        } else if (messageType === 'extendedTextMessage') {
-            body = m.message.extendedTextMessage.text;
-        } else if (messageType === 'imageMessage') {
-            body = m.message.imageMessage.caption || '';
-        } else if (messageType === 'videoMessage') {
-            body = m.message.videoMessage.caption || '';
-        } else if (messageType === 'documentMessage') {
-            body = m.message.documentMessage.caption || '';
-        }
-        
+        const mtype = m.message ? Object.keys(m.message)[0] : 'unknown';
+        const body = getMessageText(m);
+        const pushName = m.pushName || '';
         const sender = m.key.participant || m.key.remoteJid;
         
         return {
             body,
             sender,
             pushName,
-            messageType,
-            isGroup: m.key.remoteJid.endsWith('@g.us'),
+            messageType: mtype,
+            isGroup: m.key.remoteJid?.endsWith('@g.us') || false,
             timestamp: m.messageTimestamp,
             chat: m.key.remoteJid
         };
@@ -44,15 +63,36 @@ export function getMessageInfo(m, dvmsy) {
 }
 
 /**
+ * Récupère le message cité
+ */
+export function getQuotedMessage(m) {
+    if (!m) return null;
+    
+    const quoted = m.quoted || m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    
+    if (!quoted) return null;
+    
+    const quotedMtype = Object.keys(quoted)[0];
+    const quotedText = getMessageText({ message: quoted });
+    
+    return {
+        message: quoted,
+        type: quotedMtype,
+        text: quotedText,
+        sender: m.message?.extendedTextMessage?.contextInfo?.participant
+    };
+}
+
+/**
  * Vérifie si un utilisateur est owner
  */
 export function checkIsOwner(senderJid, senderNumber, m, dvmsy) {
     const ownerNums = [config.OWNER_NUMBER].filter(Boolean);
     
-    return ownerNums.includes(senderNumber) || // Par numéro
-           config.OWNERS.includes(senderJid) || // Par JID complet
-           m?.key?.fromMe || // Message du bot lui-même
-           (dvmsy?.user && senderJid === dvmsy.user.id); // C'est le bot
+    return ownerNums.includes(senderNumber) ||
+           config.OWNERS.includes(senderJid) ||
+           m?.key?.fromMe ||
+           (dvmsy?.user && senderJid === dvmsy.user.id);
 }
 
 /**
@@ -60,7 +100,7 @@ export function checkIsOwner(senderJid, senderNumber, m, dvmsy) {
  */
 export async function getGroupInfo(m, dvmsy) {
     try {
-        if (!m.key.remoteJid.endsWith('@g.us')) {
+        if (!m.key.remoteJid?.endsWith('@g.us')) {
             return { 
                 isGroup: false,
                 participants: [],
@@ -74,19 +114,14 @@ export async function getGroupInfo(m, dvmsy) {
         const metadata = await dvmsy.groupMetadata(m.key.remoteJid);
         const participants = metadata.participants || [];
         
-        // JID de l'expéditeur
         const senderJid = m.key.participant || m.key.remoteJid;
-        
-        // JID du bot
         const botJid = dvmsy.user?.id?.split(':')[0] + '@s.whatsapp.net';
         
-        // Vérifier si l'expéditeur est admin
         const senderParticipant = participants.find(p => p.id === senderJid);
         const isAdmin = senderParticipant && 
                        (senderParticipant.admin === "admin" || 
                         senderParticipant.admin === "superadmin");
         
-        // Vérifier si le bot est admin
         const botParticipant = participants.find(p => p.id === botJid);
         const isBotAdmin = botParticipant && 
                           (botParticipant.admin === "admin" || 
